@@ -1,0 +1,6 @@
+{
+  "name": "Balloon Flower Palette Guide",
+  "description": "A luxury guide for artistic balloon flower color schemes, featuring 3D rendered models and coordinated palettes.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
