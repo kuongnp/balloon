@@ -4,8 +4,8 @@
  */
 
 import { motion, AnimatePresence } from 'motion/react';
-import { Palette, Info, ChevronRight, Grid2X2, Sparkles, Filter, Camera, Upload, X, Search, MousePointer2, GitCommit, Repeat, Maximize2, Zap, Share2, MousePointerClick } from 'lucide-react';
-import { useState, useMemo, useRef, ChangeEvent, useEffect } from 'react';
+import { Palette, Info, ChevronRight, Grid2X2, Sparkles, Filter, Camera, /* Upload, */ X, Search, MousePointer2, GitCommit, Repeat, Maximize2, Zap, Share2, MousePointerClick } from 'lucide-react';
+import { useState, useMemo, /* useRef, ChangeEvent, */ useEffect } from 'react';
 
 // --- Types ---
 
@@ -2299,9 +2299,11 @@ export default function App() {
   const [randomBouquet, setRandomBouquet] = useState<{ flowers: (ColorScheme & { flowerTypeId: string; typeIcon: string; typeName: string })[], leaves: string[], fillers: string[] } | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [isBouquetSpinning, setIsBouquetSpinning] = useState(false);
+  /* Vision Scan temporarily disabled
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [analyzedBouquet, setAnalyzedBouquet] = useState<ColorScheme[] | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  */
   
   const [isEnsembleBuilderOpen, setIsEnsembleBuilderOpen] = useState(false);
   const [customBouquetConfig, setCustomBouquetConfig] = useState<CustomFlowerConfig[]>([
@@ -2311,6 +2313,7 @@ export default function App() {
   const [selectedFillerIds, setSelectedFillerIds] = useState<string[]>(['baby-breath']);
   const [ensemblePaletteId, setEnsemblePaletteId] = useState<string>('random');
 
+  /* Vision Scan temporarily disabled
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const prepareImageForUpload = (file: File): Promise<{ base64Data: string; mimeType: string }> =>
@@ -2388,6 +2391,7 @@ export default function App() {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+  */
 
   const categories = ['Royal Luxe', 'Vintage Dream', 'Modern Chrome', 'Pastel Paradise', 'Nature Harmony'];
 
@@ -2434,7 +2438,6 @@ export default function App() {
   const handleBouquetShuffle = () => {
     setIsBouquetSpinning(true);
     setRandomPalette(null);
-    setAnalyzedBouquet(null); // Clear any previous scan
     setThemeFilter(null);
     setFilter(null);
 
@@ -2599,7 +2602,6 @@ export default function App() {
   const handleGenerateCustomEnsemble = () => {
     setIsBouquetSpinning(true);
     setRandomPalette(null);
-    setAnalyzedBouquet(null);
     
     setTimeout(() => {
       const flowers = customBouquetConfig.map((conf, idx) => {
@@ -2706,8 +2708,9 @@ export default function App() {
                 <span>{isEnsembleBuilderOpen ? 'Close Builder' : 'Ensemble Magic'}</span>
               </button>
 
-              {/* AI Vision Button */}
+              {/* AI Vision Button (Disabled) */}
               <div className="relative">
+                {/*
                 <input 
                   type="file" 
                   accept="image/*" 
@@ -2715,15 +2718,18 @@ export default function App() {
                   ref={fileInputRef} 
                   onChange={handleImageScan} 
                 />
+                */}
                 <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isSpinning || isBouquetSpinning || isAnalyzingImage}
-                  className="group relative flex items-center gap-3 px-6 py-2 border border-brand-accent/40 rounded-full text-brand-accent font-mono text-[10px] uppercase tracking-[0.2em] font-bold overflow-hidden transition-all hover:bg-brand-accent hover:text-brand-bg active:scale-95 disabled:opacity-50"
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  title="Vision Scan is temporarily disabled"
+                  className="group relative flex items-center gap-3 px-6 py-2 border border-brand-accent/20 rounded-full text-brand-accent/40 font-mono text-[10px] uppercase tracking-[0.2em] font-bold overflow-hidden opacity-40 cursor-not-allowed"
                 >
-                  <div className={`transition-transform duration-1000 ${isAnalyzingImage ? 'animate-pulse' : 'group-hover:scale-110'}`}>
-                    {isAnalyzingImage ? <Sparkles size={14} className="animate-spin" /> : <Camera size={14} />}
+                  <div>
+                    <Camera size={14} />
                   </div>
-                  <span>{isAnalyzingImage ? 'Analyzing...' : 'Vision Scan'}</span>
+                  <span>Vision Scan</span>
                 </button>
               </div>
 
@@ -2757,6 +2763,7 @@ export default function App() {
       
       <GlobalBalloonStatBar />
 
+      {/* Vision Scan temporarily disabled
       {scanError && (
         <div className="max-w-7xl mx-auto mt-6 relative z-20">
           <div className="flex items-center justify-between gap-4 px-5 py-3 bg-red-500/10 border border-red-500/30 rounded text-xs font-mono text-red-300">
@@ -2767,6 +2774,7 @@ export default function App() {
           </div>
         </div>
       )}
+      */}
 
       <div className="max-w-7xl mx-auto mb-12">
       </div>
@@ -3301,6 +3309,7 @@ export default function App() {
             </motion.section>
           )}
 
+          {/* Vision Scan temporarily disabled
           {analyzedBouquet && !isAnalyzingImage && (
             <motion.section 
               initial={{ opacity: 0, y: 40 }}
@@ -3310,12 +3319,10 @@ export default function App() {
             >
               <div className="bg-brand-accent/[0.05] border border-brand-accent/60 p-8 md:p-12 rounded-[4px] relative overflow-hidden">
                 <div className="flex flex-col lg:flex-row gap-16">
-                  {/* Scanned Visualization */}
                   <div className="relative w-full lg:w-1/2 aspect-square max-w-[500px] mx-auto bg-black/40 rounded-full border border-brand-accent/20 flex items-center justify-center">
                      <div className="absolute inset-0 flex items-center justify-center">
                         <div className="relative w-full h-full">
                           {analyzedBouquet.map((flower, idx) => {
-                            // Arrangement for up to 5 flowers
                             const layouts = [
                               { scale: 1.1, x: 0, y: 0, z: 20 },
                               { scale: 0.9, x: -90, y: -40, z: 10 },
@@ -3353,7 +3360,6 @@ export default function App() {
                      </div>
                   </div>
 
-                  {/* Scanned Stats */}
                   <div className="flex-1 space-y-8">
                     <div className="space-y-4">
                       <div className="flex items-center gap-3">
@@ -3418,6 +3424,7 @@ export default function App() {
               </div>
             </motion.section>
           )}
+          */}
         </AnimatePresence>
  
         {/* Balloon Twisting Masterclass */}
