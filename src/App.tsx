@@ -6,10 +6,6 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { Palette, Info, ChevronRight, Grid2X2, Sparkles, Filter, Camera, Upload, X, Search, MousePointer2, GitCommit, Repeat, Maximize2, Zap, Share2, MousePointerClick } from 'lucide-react';
 import { useState, useMemo, useRef, ChangeEvent, useEffect } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
-
-// Initialize Gemini
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 // --- Types ---
 
@@ -2305,6 +2301,7 @@ export default function App() {
   const [isBouquetSpinning, setIsBouquetSpinning] = useState(false);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [analyzedBouquet, setAnalyzedBouquet] = useState<ColorScheme[] | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
   
   const [isEnsembleBuilderOpen, setIsEnsembleBuilderOpen] = useState(false);
   const [customBouquetConfig, setCustomBouquetConfig] = useState<CustomFlowerConfig[]>([
@@ -2316,73 +2313,60 @@ export default function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const prepareImageForUpload = (file: File): Promise<{ base64Data: string; mimeType: string }> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Failed to read image file.'));
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const img = new Image();
+        img.onerror = () => {
+          resolve({ base64Data: dataUrl.split(',')[1], mimeType: file.type || 'image/jpeg' });
+        };
+        img.onload = () => {
+          const maxDim = 1400;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve({ base64Data: dataUrl.split(',')[1], mimeType: file.type || 'image/jpeg' });
+            return;
+          }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          resolve({ base64Data: compressed.split(',')[1], mimeType: 'image/jpeg' });
+        };
+        img.src = dataUrl;
+      };
+      reader.readAsDataURL(file);
+    });
+
   const handleImageScan = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsAnalyzingImage(true);
+    setScanError(null);
     setRandomBouquet(null);
     setRandomPalette(null);
 
     try {
-      const base64Data = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(',')[1]);
-        };
-        reader.readAsDataURL(file);
+      const { base64Data, mimeType } = await prepareImageForUpload(file);
+
+      const response = await fetch('/api/vision-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64Data, mimeType }),
       });
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: `Analyze this balloon art image. Identify individual flowers in the bouquet.
-                For each flower, extract:
-                - petal_hex: Primary color of the balloon petals (Hex code).
-                - stamen_hex: Color of the center/stamen (Hex code).
-                - stem_hex: Color of the stem (Hex code).
-                - material: Texture type (choose one: 'Matte', 'Chrome', 'Pastel').
-                - mood: Choose the closest mood from [RED, ORANGE, YELLOW, GREEN, BLUE, INDIGO, VIOLET, WHITE, BLACK, BROWN].
-                - name: A creative name for this flower.
-                
-                Limit to exactly 5 flowers if possible, or fewer if the image has less.
-                Return as a JSON array.`
-              },
-              {
-                inlineData: {
-                  mimeType: file.type,
-                  data: base64Data
-                }
-              }
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                petal_hex: { type: Type.STRING },
-                stamen_hex: { type: Type.STRING },
-                stem_hex: { type: Type.STRING },
-                material: { type: Type.STRING },
-                mood: { type: Type.STRING },
-                name: { type: Type.STRING }
-              },
-              required: ["petal_hex", "stamen_hex", "stem_hex", "material", "mood", "name"]
-            }
-          }
-        }
-      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to analyze image.');
+      }
 
-      const results = JSON.parse(response.text);
+      const results = Array.isArray(payload?.flowers) ? payload.flowers : [];
       const newBouquet: ColorScheme[] = results.map((item: any, i: number) => ({
         id: `scanned-${Date.now()}-${i}`,
         name: item.name,
@@ -2398,7 +2382,7 @@ export default function App() {
       window.scrollTo({ top: 300, behavior: 'smooth' });
     } catch (error) {
       console.error("AI Scan failed:", error);
-      alert("Failed to analyze image. Please try again with a clearer photo.");
+      setScanError(error instanceof Error ? error.message : "Failed to analyze image. Please try again with a clearer photo.");
     } finally {
       setIsAnalyzingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -2772,6 +2756,17 @@ export default function App() {
       </header>
       
       <GlobalBalloonStatBar />
+
+      {scanError && (
+        <div className="max-w-7xl mx-auto mt-6 relative z-20">
+          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-red-500/10 border border-red-500/30 rounded text-xs font-mono text-red-300">
+            <span>Vision Scan: {scanError}</span>
+            <button onClick={() => setScanError(null)} className="text-red-300/60 hover:text-red-200 transition-colors">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto mb-12">
       </div>
